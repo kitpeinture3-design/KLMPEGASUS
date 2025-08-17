@@ -1,0 +1,33 @@
+@echo off
+echo === Vérification des conteneurs Docker ===
+docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+echo.
+
+echo === Vérification des logs backend ===
+docker logs --tail 20 klm-pegasus-backend
+echo.
+
+echo === Vérification des logs AI service ===
+docker logs --tail 20 klm-pegasus-ai-service
+echo.
+
+echo === Test de connexion PostgreSQL ===
+docker exec klm-pegasus-postgres pg_isready -U postgres
+echo.
+
+echo === Test de connexion MongoDB ===
+docker exec klm-pegasus-mongodb mongo --eval "db.stats()"
+echo.
+
+echo === Test de connexion Redis ===
+docker exec klm-pegasus-redis redis-cli ping
+echo.
+
+echo === Vérification frontend ===
+echo Ouvre dans le navigateur : http://localhost:3000
+echo.
+
+echo === Vérification état de santé complet ===
+for /f "tokens=*" %%i in ('docker ps -q') do docker inspect --format="{{.Name}} {{range .State.Health.Log}}{{.Output}}{{end}}" %%i
+echo.
+pause

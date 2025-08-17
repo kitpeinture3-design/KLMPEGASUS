@@ -1,0 +1,299 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                 String    @id @default(uuid())
+  email              String    @unique
+  passwordHash       String    @map("password_hash")
+  firstName          String?   @map("first_name")
+  lastName           String?   @map("last_name")
+  role               Role      @default(USER)
+  subscriptionPlan   Plan      @default(BASIC) @map("subscription_plan")
+  subscriptionStatus Status    @default(ACTIVE) @map("subscription_status")
+  stripeCustomerId   String?   @map("stripe_customer_id")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+  lastLogin          DateTime? @map("last_login")
+  emailVerified      Boolean   @default(false) @map("email_verified")
+  profileImageUrl    String?   @map("profile_image_url")
+  phone              String?
+  companyName        String?   @map("company_name")
+  industry           String?
+  timezone           String    @default("UTC")
+
+  // Relations
+  sites     Site[]
+  sessions  UserSession[]
+  apiKeys   ApiKey[]
+
+  @@map("users")
+}
+
+model UserSession {
+  id           String   @id @default(uuid())
+  userId       String   @map("user_id")
+  token        String   @unique
+  refreshToken String?  @map("refresh_token")
+  expiresAt    DateTime @map("expires_at")
+  createdAt    DateTime @default(now()) @map("created_at")
+  ipAddress    String?  @map("ip_address")
+  userAgent    String?  @map("user_agent")
+  isActive     Boolean  @default(true) @map("is_active")
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_sessions")
+}
+
+model ApiKey {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  name      String
+  key       String   @unique
+  lastUsed  DateTime? @map("last_used")
+  createdAt DateTime @default(now()) @map("created_at")
+  expiresAt DateTime? @map("expires_at")
+  isActive  Boolean  @default(true) @map("is_active")
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("api_keys")
+}
+
+model Site {
+  id              String    @id @default(uuid())
+  userId          String    @map("user_id")
+  name            String
+  slug            String    @unique
+  domain          String?
+  status          SiteStatus @default(DRAFT)
+  publishedAt     DateTime? @map("published_at")
+  configJson      Json?     @map("config_json")
+  brandingJson    Json?     @map("branding_json")
+  seoConfig       Json?     @map("seo_config")
+  analyticsConfig Json?     @map("analytics_config")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+  templateId      String?   @map("template_id")
+  customCss       String?   @map("custom_css")
+  customJs        String?   @map("custom_js")
+  faviconUrl      String?   @map("favicon_url")
+  socialImageUrl  String?   @map("social_image_url")
+
+  // Relations
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  pages     Page[]
+  products  Product[]
+  orders    Order[]
+  customers Customer[]
+
+  @@map("sites")
+}
+
+model Page {
+  id              String     @id @default(uuid())
+  siteId          String     @map("site_id")
+  title           String
+  slug            String
+  contentJson     Json?      @map("content_json")
+  metaTitle       String?    @map("meta_title")
+  metaDescription String?    @map("meta_description")
+  metaKeywords    String?    @map("meta_keywords")
+  status          PageStatus @default(DRAFT)
+  pageType        PageType   @default(STANDARD)
+  sortOrder       Int        @default(0) @map("sort_order")
+  createdAt       DateTime   @default(now()) @map("created_at")
+  updatedAt       DateTime   @updatedAt @map("updated_at")
+
+  // Relations
+  site Site @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  @@unique([siteId, slug])
+  @@map("pages")
+}
+
+model Product {
+  id               String         @id @default(uuid())
+  siteId           String         @map("site_id")
+  sku              String         @unique
+  title            String
+  description      String?
+  shortDescription String?        @map("short_description")
+  price            Decimal        @db.Decimal(10, 2)
+  comparePrice     Decimal?       @map("compare_price") @db.Decimal(10, 2)
+  costPrice        Decimal?       @map("cost_price") @db.Decimal(10, 2)
+  stockQuantity    Int            @default(0) @map("stock_quantity")
+  trackInventory   Boolean        @default(true) @map("track_inventory")
+  weight           Decimal?       @db.Decimal(8, 2)
+  dimensionsJson   Json?          @map("dimensions_json")
+  imagesJson       Json?          @map("images_json")
+  variantsJson     Json?          @map("variants_json")
+  seoTitle         String?        @map("seo_title")
+  seoDescription   String?        @map("seo_description")
+  tags             String[]
+  categoryId       String?        @map("category_id")
+  status           ProductStatus  @default(ACTIVE)
+  featured         Boolean        @default(false)
+  createdAt        DateTime       @default(now()) @map("created_at")
+  updatedAt        DateTime       @updatedAt @map("updated_at")
+
+  // Relations
+  site      Site        @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  orderItems OrderItem[]
+
+  @@map("products")
+}
+
+model Customer {
+  id                String    @id @default(uuid())
+  siteId            String    @map("site_id")
+  email             String
+  firstName         String?   @map("first_name")
+  lastName          String?   @map("last_name")
+  phone             String?
+  acceptsMarketing  Boolean   @default(false) @map("accepts_marketing")
+  totalSpent        Decimal   @default(0) @db.Decimal(10, 2) @map("total_spent")
+  ordersCount       Int       @default(0) @map("orders_count")
+  lastOrderDate     DateTime? @map("last_order_date")
+  tags              String[]
+  notes             String?
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  site   Site    @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  orders Order[]
+
+  @@unique([siteId, email])
+  @@map("customers")
+}
+
+model Order {
+  id                    String            @id @default(uuid())
+  siteId                String            @map("site_id")
+  customerId            String?           @map("customer_id")
+  orderNumber           String            @unique @map("order_number")
+  status                OrderStatus       @default(PENDING)
+  paymentStatus         PaymentStatus     @default(PENDING) @map("payment_status")
+  fulfillmentStatus     FulfillmentStatus @default(UNFULFILLED) @map("fulfillment_status")
+  totalAmount           Decimal           @map("total_amount") @db.Decimal(10, 2)
+  subtotal              Decimal           @db.Decimal(10, 2)
+  taxAmount             Decimal           @default(0) @map("tax_amount") @db.Decimal(10, 2)
+  shippingAmount        Decimal           @default(0) @map("shipping_amount") @db.Decimal(10, 2)
+  discountAmount        Decimal           @default(0) @map("discount_amount") @db.Decimal(10, 2)
+  currency              String            @default("EUR")
+  stripePaymentIntentId String?           @map("stripe_payment_intent_id")
+  billingAddressJson    Json?             @map("billing_address_json")
+  shippingAddressJson   Json?             @map("shipping_address_json")
+  notes                 String?
+  createdAt             DateTime          @default(now()) @map("created_at")
+  updatedAt             DateTime          @updatedAt @map("updated_at")
+
+  // Relations
+  site      Site        @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  customer  Customer?   @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  orderItems OrderItem[]
+
+  @@map("orders")
+}
+
+model OrderItem {
+  id        String  @id @default(uuid())
+  orderId   String  @map("order_id")
+  productId String  @map("product_id")
+  quantity  Int
+  price     Decimal @db.Decimal(10, 2)
+  total     Decimal @db.Decimal(10, 2)
+  variantId String? @map("variant_id")
+
+  // Relations
+  order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@map("order_items")
+}
+
+// Enums
+enum Role {
+  USER
+  ADMIN
+  SUPER_ADMIN
+}
+
+enum Plan {
+  BASIC
+  PREMIUM
+  ENTERPRISE
+}
+
+enum Status {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+  CANCELLED
+}
+
+enum SiteStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum PageStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum PageType {
+  STANDARD
+  HOME
+  ABOUT
+  CONTACT
+  PRODUCT
+  BLOG
+  CUSTOM
+}
+
+enum ProductStatus {
+  ACTIVE
+  INACTIVE
+  ARCHIVED
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  PROCESSING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+  REFUNDED
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+  PARTIALLY_REFUNDED
+}
+
+enum FulfillmentStatus {
+  UNFULFILLED
+  PARTIAL
+  FULFILLED
+  CANCELLED
+}
+
